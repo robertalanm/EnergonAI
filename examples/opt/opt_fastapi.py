@@ -86,38 +86,42 @@ FIXED_CACHE_KEYS = [
 ]
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('model', choices=['opt-125m', 'opt-6.7b', 'opt-30b', 'opt-175b'])
-    parser.add_argument('--tp', type=int, default=1)
-    parser.add_argument('--master_host', default='localhost')
-    parser.add_argument('--master_port', type=int, default=19990)
-    parser.add_argument('--rpc_port', type=int, default=19980)
-    parser.add_argument('--max_batch_size', type=int, default=8)
-    parser.add_argument('--pipe_size', type=int, default=1)
-    parser.add_argument('--queue_size', type=int, default=0)
-    parser.add_argument('--http_host', default='0.0.0.0')
-    parser.add_argument('--http_port', type=int, default=7070)
-    parser.add_argument('--checkpoint', default=None)
-    parser.add_argument('--cache_size', type=int, default=0)
-    parser.add_argument('--cache_list_size', type=int, default=1)
-    args = parser.parse_args()
-    print_args(args)
-    model_kwargs = {}
-    if args.checkpoint is not None:
-        model_kwargs['checkpoint'] = args.checkpoint
+    try:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('model', choices=['opt-125m', 'opt-6.7b', 'opt-30b', 'opt-175b'])
+        parser.add_argument('--tp', type=int, default=1)
+        parser.add_argument('--master_host', default='localhost')
+        parser.add_argument('--master_port', type=int, default=19990)
+        parser.add_argument('--rpc_port', type=int, default=19980)
+        parser.add_argument('--max_batch_size', type=int, default=8)
+        parser.add_argument('--pipe_size', type=int, default=1)
+        parser.add_argument('--queue_size', type=int, default=0)
+        parser.add_argument('--http_host', default='0.0.0.0')
+        parser.add_argument('--http_port', type=int, default=7070)
+        parser.add_argument('--checkpoint', default=None)
+        parser.add_argument('--cache_size', type=int, default=0)
+        parser.add_argument('--cache_list_size', type=int, default=1)
+        args = parser.parse_args()
+        print_args(args)
+        model_kwargs = {}
+        if args.checkpoint is not None:
+            model_kwargs['checkpoint'] = args.checkpoint
 
-    logger = logging.getLogger(__name__)
-    tokenizer = GPT2Tokenizer.from_pretrained('facebook/opt-30b')
-    if args.cache_size > 0:
-        cache = ListCache(args.cache_size, args.cache_list_size, fixed_keys=FIXED_CACHE_KEYS)
-    else:
-        cache = None
-    engine = launch_engine(args.tp, 1, args.master_host, args.master_port, args.rpc_port, get_model_fn(args.model),
-                           batch_manager=BatchManagerForGeneration(max_batch_size=args.max_batch_size,
-                                                                   pad_token_id=tokenizer.pad_token_id),
-                           pipe_size=args.pipe_size,
-                           queue_size=args.queue_size,
-                           **model_kwargs)
-    config = uvicorn.Config(app, host=args.http_host, port=args.http_port)
-    server = uvicorn.Server(config=config)
-    server.run()
+        logger = logging.getLogger(__name__)
+        tokenizer = GPT2Tokenizer.from_pretrained('facebook/opt-30b')
+        if args.cache_size > 0:
+            cache = ListCache(args.cache_size, args.cache_list_size, fixed_keys=FIXED_CACHE_KEYS)
+        else:
+            cache = None
+        engine = launch_engine(args.tp, 1, args.master_host, args.master_port, args.rpc_port, get_model_fn(args.model),
+                            batch_manager=BatchManagerForGeneration(max_batch_size=args.max_batch_size,
+                                                                    pad_token_id=tokenizer.pad_token_id),
+                            pipe_size=args.pipe_size,
+                            queue_size=args.queue_size,
+                            **model_kwargs)
+        config = uvicorn.Config(app, host=args.http_host, port=args.http_port)
+        server = uvicorn.Server(config=config)
+        server.run()
+    except KeyboardInterrupt:
+        import sys
+        sys.exit()

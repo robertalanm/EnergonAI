@@ -59,6 +59,38 @@ async def generate(request: Request, body: GenerationTaskReq):
     return json({'text': output})
 
 
+@app.post('/causallmnext')
+@openapi.body(GenerationTaskReq)
+@validate(json=GenerationTaskReq)
+async def generate(request: Request, body: GenerationTaskReq):
+    logger.info(f'{request.ip}:{request.port} - "{request.method} {request.path}" - {body}')
+    key = (body.prompt, body.max_tokens)
+    try:
+        if cache is None:
+            raise MissCacheError()
+        outputs = cache.get(key)
+        output = random.choice(outputs)
+        logger.info('Cache hit')
+    except MissCacheError:
+        inputs = tokenizer(body.prompt, truncation=True, max_length=512)
+        inputs['max_tokens'] = body.max_tokens
+        inputs['top_k'] = body.top_k
+        inputs['top_p'] = body.top_p
+        inputs['temperature'] = body.temperature
+        try:
+            uid = id(body)
+            engine.submit(uid, inputs)
+            output = await engine.wait(uid)
+            assert isinstance(output, Tensor)
+            output = tokenizer.decode(output, skip_special_tokens=True)
+            if cache is not None:
+                cache.add(key, output)
+        except QueueFullError as e:
+            return json({'detail': e.args[0]}, status=406)
+
+    return json({'text': output})
+
+
 @app.after_server_stop
 def shutdown(*_):
     engine.shutdown()

@@ -4,7 +4,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi import Response
 import torch.distributed.rpc as rpc
-from energonai.engine import AsyncEngine
+from energonai.engine import launch_engine as launch_inference_engine
 
 from transformers import GPT2Tokenizer
 
@@ -82,8 +82,7 @@ def launch_engine(model_class,
                  batch_manager: Optional[BatchManager] = None, pipe_size: int = 1, queue_size: int = 0) -> None:
     '''
 
-    engine = AsyncEngine(1, 1, host, port, 1, pipe_size=1, queue_size=0)
-
+    engine = launch_inference_engine()
     global server
     config = uvicorn.Config(app, host=server_host, port=server_port, log_level=log_level)
     server = uvicorn.Server(config=config)
